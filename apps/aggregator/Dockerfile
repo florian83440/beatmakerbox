@@ -7,7 +7,7 @@ WORKDIR /workspace
 RUN corepack enable
 
 # Copy the workspace skeleton needed to install + build the aggregator.
-# Build context must be the monorepo root (see docker-compose).
+# Build context must be the monorepo root (compose uses `context: ../..`).
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml* ./
 COPY packages/dsp ./packages/dsp
 COPY apps/aggregator ./apps/aggregator
@@ -18,16 +18,26 @@ RUN pnpm install --frozen-lockfile --filter @beatmakerbox/aggregator... \
 
 RUN pnpm --filter @beatmakerbox/aggregator build
 
+# `pnpm deploy` produces a self-contained directory with a real (NOT
+# symlinked) node_modules and the package's own files (incl. dist/).
+# `--prod` keeps only runtime deps. This is the canonical fix for the
+# pnpm-symlinks-in-Docker problem: a plain `COPY node_modules` would
+# preserve the symlinks pointing into .pnpm/, which no longer exist
+# in the runtime image — every require() then fails with ERR_MODULE_NOT_FOUND.
+RUN pnpm --filter @beatmakerbox/aggregator deploy --prod /deploy
+
 # ---- Runtime stage ------------------------------------------------------
 FROM node:22-alpine AS runtime
 WORKDIR /app
 
+# Production mode → Fastify uses the JSON pino transport (no pino-pretty).
+ENV NODE_ENV=production
+
 RUN apk add --no-cache wget tini
 
-# Copy node_modules + built artifact + package.json (for "type": "module").
-COPY --from=build /workspace/apps/aggregator/dist           ./dist
-COPY --from=build /workspace/apps/aggregator/package.json   ./package.json
-COPY --from=build /workspace/apps/aggregator/node_modules   ./node_modules
+# Copy the standalone deploy directory: package.json, node_modules (flat),
+# dist/, etc.
+COPY --from=build /deploy ./
 
 # SQLite file lives here, mount as a volume.
 RUN mkdir -p /app/data && chown -R node:node /app
