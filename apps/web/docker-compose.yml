@@ -8,8 +8,10 @@
 services:
   web:
     build:
-      context: .
-      dockerfile: Dockerfile
+      # Build context = monorepo root, because the web app pulls in the
+      # @beatmakerbox/dsp workspace package.
+      context: ../..
+      dockerfile: apps/web/Dockerfile
     image: beatmakerbox:latest
     container_name: beatmakerbox-web-1
     restart: unless-stopped
