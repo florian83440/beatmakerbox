@@ -46,6 +46,17 @@ export interface ListPacksParams {
   signal?: AbortSignal
 }
 
+async function apiFetch(url: string, signal?: AbortSignal): Promise<Response> {
+  let res: Response
+  try {
+    res = await fetch(url, { signal })
+  } catch (e) {
+    // Network-level failure (aggregator not running, proxy unreachable, etc.)
+    throw new Error('aggregator_unreachable')
+  }
+  return res
+}
+
 export async function listPacks(params: ListPacksParams = {}): Promise<PacksListResponse> {
   const u = new URL(`${RAW_BASE}/packs`, window.location.origin)
   if (params.source) u.searchParams.set('source', params.source)
@@ -53,23 +64,23 @@ export async function listPacks(params: ListPacksParams = {}): Promise<PacksList
   if (params.page) u.searchParams.set('page', String(params.page))
   if (params.limit) u.searchParams.set('limit', String(params.limit))
 
-  const res = await fetch(u.toString(), { signal: params.signal })
-  if (!res.ok) throw new Error(`API ${res.status}`)
+  const res = await apiFetch(u.toString(), params.signal)
+  if (!res.ok) throw new Error(`api_${res.status}`)
   return (await res.json()) as PacksListResponse
 }
 
 export async function getPack(slug: string, signal?: AbortSignal): Promise<PackDto | null> {
   const u = `${RAW_BASE}/packs/${encodeURIComponent(slug)}`
-  const res = await fetch(u, { signal })
+  const res = await apiFetch(u, signal)
   if (res.status === 404) return null
-  if (!res.ok) throw new Error(`API ${res.status}`)
+  if (!res.ok) throw new Error(`api_${res.status}`)
   const body = (await res.json()) as { pack: PackDto }
   return body.pack
 }
 
 export async function listSources(signal?: AbortSignal): Promise<SourceInfo[]> {
-  const res = await fetch(`${RAW_BASE}/sources`, { signal })
-  if (!res.ok) throw new Error(`API ${res.status}`)
+  const res = await apiFetch(`${RAW_BASE}/sources`, signal)
+  if (!res.ok) throw new Error(`api_${res.status}`)
   const body = (await res.json()) as { sources: SourceInfo[] }
   return body.sources
 }

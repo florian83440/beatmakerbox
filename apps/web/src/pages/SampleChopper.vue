@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useHead } from '@unhead/vue'
-import { useChopper, SLICE_COUNT_OPTIONS, type SliceCount } from '@/composables/useChopper'
+import { useChopper, SLICE_COUNT_OPTIONS, type SliceCount, type SliceMode } from '@/composables/useChopper'
 import { extractWaveform, toMono } from '@beatmakerbox/dsp'
 
 useHead({
@@ -168,7 +168,7 @@ async function onFileChange(e: Event): Promise<void> {
   waveformPeaks = null
 }
 
-watch(() => chop.sliceCount.value, () => { /* peaks already cover the full file */ })
+watch([() => chop.sliceCount.value, () => chop.sliceMode.value], () => { /* peaks already cover the full file */ })
 
 // ---- pattern drag-and-drop ---------------------------------------------
 const dragFromIndex = ref<number | null>(null)
@@ -241,7 +241,35 @@ onBeforeUnmount(() => {
         {{ chop.fileName.value ? 'Replace file' : 'Load audio file' }}
       </button>
 
-      <div class="ml-2 flex items-center gap-1">
+      <!-- Slice mode toggle -->
+      <div class="flex items-center gap-1">
+        <span class="label mr-2">Mode</span>
+        <button
+          type="button"
+          class="rounded-md border px-2.5 py-1 text-xs font-medium transition-all"
+          :class="chop.sliceMode.value === 'equal'
+            ? 'border-[var(--color-teal)] bg-[var(--color-teal)]/15 text-[var(--color-teal)]'
+            : 'border-[var(--color-edge)] bg-[var(--color-surface-2)] text-[var(--color-text-soft)] hover:bg-[var(--color-surface-3)]'"
+          @click="chop.setSliceMode('equal' as SliceMode)"
+        >
+          Equal
+        </button>
+        <button
+          type="button"
+          class="rounded-md border px-2.5 py-1 text-xs font-medium transition-all"
+          :class="chop.sliceMode.value === 'onset'
+            ? 'border-[var(--color-teal)] bg-[var(--color-teal)]/15 text-[var(--color-teal)]'
+            : 'border-[var(--color-edge)] bg-[var(--color-surface-2)] text-[var(--color-text-soft)] hover:bg-[var(--color-surface-3)]'"
+          :disabled="!chop.isLoaded.value"
+          @click="chop.setSliceMode('onset' as SliceMode)"
+        >
+          <span v-if="chop.isDetectingOnsets.value" class="opacity-60">Detecting…</span>
+          <span v-else>Transients</span>
+        </button>
+      </div>
+
+      <!-- Equal-slice count (only shown in equal mode) -->
+      <div v-if="chop.sliceMode.value === 'equal'" class="flex items-center gap-1">
         <span class="label mr-2">Slices</span>
         <button
           v-for="n in SLICE_COUNT_OPTIONS"
@@ -255,6 +283,10 @@ onBeforeUnmount(() => {
         >
           {{ n }}
         </button>
+      </div>
+      <!-- Onset slice count info (only shown in onset mode) -->
+      <div v-else-if="chop.sliceMode.value === 'onset' && chop.onsetSlices.value.length > 0" class="flex items-center gap-1">
+        <span class="mono text-xs text-[var(--color-teal)]">{{ chop.onsetSlices.value.length }} transients detected</span>
       </div>
 
       <p v-if="chop.fileName.value" class="mono ml-auto truncate text-xs text-[var(--color-text-muted)]">

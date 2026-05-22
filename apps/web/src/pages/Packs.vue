@@ -25,6 +25,7 @@ const query = ref('')
 const debouncedQuery = ref('')
 const isLoading = ref(false)
 const error = ref<string | null>(null)
+const errorKind = ref<'unreachable' | 'api' | null>(null)
 
 let activeController: AbortController | null = null
 let debounceHandle: number | null = null
@@ -42,6 +43,7 @@ async function fetchData(): Promise<void> {
   activeController = new AbortController()
   isLoading.value = true
   error.value = null
+  errorKind.value = null
   try {
     const result = await listPacks({
       page: page.value,
@@ -55,7 +57,13 @@ async function fetchData(): Promise<void> {
     pages.value = result.pages
   } catch (e) {
     if ((e as Error).name === 'AbortError') return
-    error.value = e instanceof Error ? e.message : 'Failed to load packs'
+    const msg = e instanceof Error ? e.message : 'Failed to load packs'
+    if (msg === 'aggregator_unreachable') {
+      errorKind.value = 'unreachable'
+    } else {
+      errorKind.value = 'api'
+    }
+    error.value = msg
   } finally {
     isLoading.value = false
   }
@@ -187,10 +195,29 @@ function resetFilters(): void {
 
     <div
       v-if="error"
-      class="panel-flat mb-4 border-l-2 border-l-[var(--color-magenta)] px-4 py-3 text-sm text-[var(--color-magenta)]"
+      class="panel mb-4 border-l-2 border-l-[var(--color-magenta)] px-5 py-4"
     >
-      Couldn't reach the packs API: {{ error }}.<br />
-      Set <code class="mono">VITE_PACKS_API_URL</code> at build time (e.g. <code class="mono">https://api.beatmakerbox.com</code>).
+      <!-- Aggregator not running locally -->
+      <template v-if="errorKind === 'unreachable'">
+        <p class="text-sm font-semibold text-[var(--color-magenta)]">Aggregator not reachable</p>
+        <p class="mt-1 text-sm text-[var(--color-text-soft)]">
+          The packs API is unavailable. In development, start the aggregator in a second terminal:
+        </p>
+        <pre class="screen mono mt-3 overflow-x-auto px-4 py-3 text-xs text-[var(--color-text)]">cd apps/aggregator
+cp .env.example .env   # first time only
+pnpm dev               # listens on :3001, proxied by Vite</pre>
+        <p class="mt-3 text-xs text-[var(--color-text-muted)]">
+          In production, set <code class="mono">VITE_PACKS_API_URL</code> to your aggregator origin at build time.
+        </p>
+      </template>
+
+      <!-- API returned an unexpected HTTP error -->
+      <template v-else>
+        <p class="text-sm font-semibold text-[var(--color-magenta)]">API error ({{ error }})</p>
+        <p class="mt-1 text-sm text-[var(--color-text-soft)]">
+          The aggregator responded with an unexpected error. Check the server logs.
+        </p>
+      </template>
     </div>
 
     <!-- Skeleton while loading + empty state -->

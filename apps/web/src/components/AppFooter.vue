@@ -24,6 +24,9 @@ import { RouterLink } from 'vue-router'
             <li><RouterLink to="/note-tuner" class="ink-link">808 / Note Tuner</RouterLink></li>
             <li><RouterLink to="/metronome" class="ink-link">Metronome</RouterLink></li>
             <li><RouterLink to="/sample-chopper" class="ink-link">Sample Chopper</RouterLink></li>
+            <li><RouterLink to="/gain-meter" class="ink-link">Gain & Loudness Meter</RouterLink></li>
+            <li><RouterLink to="/bpm-tap" class="ink-link">BPM Tap & Delay Calc</RouterLink></li>
+            <li><RouterLink to="/bit-crusher" class="ink-link">Bit Crusher</RouterLink></li>
             <li><RouterLink to="/packs" class="ink-link">Free Sample Packs</RouterLink></li>
           </ul>
         </div>

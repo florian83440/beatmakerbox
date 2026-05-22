@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
+import { useToolbox } from '@/composables/useToolbox'
+
+const tb = useToolbox()
 
 const nav = [
   { to: '/key-finder',     label: 'Key',     accent: 'var(--color-accent)' },
@@ -8,6 +11,9 @@ const nav = [
   { to: '/note-tuner',     label: 'Note',    accent: 'var(--color-magenta)' },
   { to: '/metronome',      label: 'Click',   accent: 'var(--color-violet)' },
   { to: '/sample-chopper', label: 'Chop',    accent: 'var(--color-teal)' },
+  { to: '/gain-meter',     label: 'Gain',    accent: 'var(--color-lime)' },
+  { to: '/bpm-tap',        label: 'Tap',     accent: 'var(--color-cyan)' },
+  { to: '/bit-crusher',    label: 'Crush',   accent: 'var(--color-accent)' },
   { to: '/packs',          label: 'Packs',   accent: 'var(--color-emerald)' },
 ]
 </script>
@@ -50,6 +56,25 @@ const nav = [
           />
           {{ item.label }}
         </RouterLink>
+
+        <!-- Toolbox toggle -->
+        <button
+          type="button"
+          class="ml-1 flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-all"
+          :class="tb.isOpen.value
+            ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/12 text-[var(--color-accent)]'
+            : 'border-[var(--color-edge)] bg-[var(--color-surface-2)] text-[var(--color-text-soft)] hover:bg-[var(--color-surface-3)] hover:text-[var(--color-text)]'"
+          title="Toolbox — Gain · BPM · Crusher"
+          @click="tb.toggle()"
+        >
+          <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <rect x="3" y="3" width="8" height="8" rx="1.5" />
+            <rect x="13" y="3" width="8" height="8" rx="1.5" />
+            <rect x="3" y="13" width="8" height="8" rx="1.5" />
+            <rect x="13" y="13" width="8" height="8" rx="1.5" />
+          </svg>
+          <span class="hidden sm:inline">Tools</span>
+        </button>
       </nav>
     </div>
   </header>

@@ -86,7 +86,7 @@ const subIndices = computed(() => Array.from({ length: metro.subdivision.value }
   <div class="mx-auto max-w-3xl px-4 py-12 sm:px-6 sm:py-16">
     <header class="mb-8 flex flex-col items-start gap-3 sm:mb-10">
       <div class="flex items-center gap-2">
-        <span class="chip" style="background: rgba(167,139,250,0.14); border-color: rgba(167,139,250,0.3); color: var(--color-violet);">tool · 06</span>
+        <span class="chip" style="background: rgba(167,139,250,0.14); border-color: rgba(167,139,250,0.3); color: var(--color-violet);">tool · 05</span>
         <span class="chip">look-ahead</span>
         <span class="chip">sample-accurate</span>
       </div>

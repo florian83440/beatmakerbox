@@ -43,6 +43,21 @@ export const routes: RouteRecordRaw[] = [
     component: () => import('@/pages/SampleChopper.vue'),
   },
   {
+    path: '/gain-meter',
+    name: 'gain-meter',
+    component: () => import('@/pages/GainMeter.vue'),
+  },
+  {
+    path: '/bpm-tap',
+    name: 'bpm-tap',
+    component: () => import('@/pages/BpmTap.vue'),
+  },
+  {
+    path: '/bit-crusher',
+    name: 'bit-crusher',
+    component: () => import('@/pages/BitCrusher.vue'),
+  },
+  {
     path: '/packs',
     name: 'packs',
     component: () => import('@/pages/Packs.vue'),

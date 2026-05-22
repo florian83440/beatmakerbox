@@ -1,12 +1,15 @@
-// Sample chopper — slice a loop into N equal pieces, audition them,
-// arrange a pattern, render the pattern to a WAV.
+// Sample chopper — slice a loop into N equal pieces OR at detected onsets,
+// audition them, arrange a pattern, render the pattern to a WAV.
 //
 // Playback uses one AudioBufferSourceNode per scheduled slice (sources
 // are single-use in Web Audio). The pattern loop reschedules itself
 // slightly before each iteration ends to avoid audible gaps.
 
 import { ref, shallowRef, computed, onBeforeUnmount } from 'vue'
-import { decodeAudioFile, audioBufferToWav, downloadBlob, type DecodedAudio } from '@beatmakerbox/dsp'
+import {
+  decodeAudioFile, audioBufferToWav, downloadBlob, toMono,
+  detectOnsets, type DecodedAudio, type OnsetSlice,
+} from '@beatmakerbox/dsp'
 
 export interface ChopperSlice {
   index: number
@@ -23,6 +26,7 @@ export interface PatternStep {
 
 export const SLICE_COUNT_OPTIONS = [4, 8, 16, 32, 64] as const
 export type SliceCount = typeof SLICE_COUNT_OPTIONS[number]
+export type SliceMode = 'equal' | 'onset'
 
 function uid(): string {
   // crypto.randomUUID() is fine in modern browsers; fallback for old ones.
@@ -38,6 +42,9 @@ export function useChopper() {
   const error = ref<string | null>(null)
   const isDecoding = ref(false)
   const sliceCount = ref<SliceCount>(16)
+  const sliceMode = ref<SliceMode>('equal')
+  const isDetectingOnsets = ref(false)
+  const onsetSlices = ref<OnsetSlice[]>([])
   const pattern = ref<PatternStep[]>([])
   const auditioningSlice = ref<number | null>(null)
   const isPlayingPattern = ref(false)
@@ -52,6 +59,15 @@ export function useChopper() {
 
   const slices = computed<ChopperSlice[]>(() => {
     if (!decoded.value) return []
+
+    if (sliceMode.value === 'onset' && onsetSlices.value.length > 0) {
+      return onsetSlices.value.map((s, i) => ({
+        index: i,
+        startSeconds: s.startSeconds,
+        durationSeconds: s.durationSeconds,
+      }))
+    }
+
     const total = decoded.value.durationSeconds
     const n = sliceCount.value
     const each = total / n
@@ -87,6 +103,7 @@ export function useChopper() {
     error.value = null
     fileName.value = file.name
     isDecoding.value = true
+    onsetSlices.value = []
     try {
       const d = await decodeAudioFile(file)
       decoded.value = d
@@ -104,8 +121,37 @@ export function useChopper() {
 
   function setSliceCount(n: SliceCount): void {
     sliceCount.value = n
-    // Drop any pattern entries that point past the new slice range.
+    sliceMode.value = 'equal'
     pattern.value = pattern.value.filter((s) => s.sliceIndex < n)
+  }
+
+  async function runOnsetDetection(): Promise<void> {
+    if (!decoded.value) return
+    isDetectingOnsets.value = true
+    try {
+      const mono = toMono(decoded.value.buffer)
+      const results = detectOnsets(mono, decoded.value.sampleRate, { maxSlices: 64 })
+      onsetSlices.value = results
+      sliceMode.value = 'onset'
+      // Drop pattern entries that point past the new slice range.
+      pattern.value = pattern.value.filter((s) => s.sliceIndex < results.length)
+    } finally {
+      isDetectingOnsets.value = false
+    }
+  }
+
+  function setSliceMode(mode: SliceMode): void {
+    if (mode === 'equal') {
+      sliceMode.value = 'equal'
+      pattern.value = pattern.value.filter((s) => s.sliceIndex < sliceCount.value)
+    } else if (mode === 'onset') {
+      if (onsetSlices.value.length > 0) {
+        sliceMode.value = 'onset'
+        pattern.value = pattern.value.filter((s) => s.sliceIndex < onsetSlices.value.length)
+      } else {
+        void runOnsetDetection()
+      }
+    }
   }
 
   async function auditionSlice(index: number): Promise<void> {
@@ -294,6 +340,9 @@ export function useChopper() {
     isDecoding,
     isLoaded,
     sliceCount,
+    sliceMode,
+    isDetectingOnsets,
+    onsetSlices,
     slices,
     pattern,
     patternDurationSeconds,
@@ -305,6 +354,8 @@ export function useChopper() {
     load,
     reset,
     setSliceCount,
+    setSliceMode,
+    runOnsetDetection,
     auditionSlice,
     addStep,
     removeStep,

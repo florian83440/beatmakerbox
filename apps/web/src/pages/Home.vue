@@ -86,6 +86,33 @@ const tools: Tool[] = [
     accent: 'var(--color-emerald)',
     ready: true,
   },
+  {
+    num: '08',
+    slug: 'gain-meter',
+    name: 'Gain & Loudness Meter',
+    category: 'Analysis',
+    description: 'Measure peak dBFS, RMS and integrated LUFS-I (BS.1770). Know exactly how hot your sample is before mixing.',
+    accent: 'var(--color-lime)',
+    ready: true,
+  },
+  {
+    num: '09',
+    slug: 'bpm-tap',
+    name: 'BPM Tap & Delay Calc',
+    category: 'Tempo',
+    description: 'Tap tempo + delay time table. Get every note value from 1/1 to 1/32 — dotted and triplets — in milliseconds.',
+    accent: 'var(--color-cyan)',
+    ready: true,
+  },
+  {
+    num: '10',
+    slug: 'bit-crusher',
+    name: 'Bit Crusher',
+    category: 'FX',
+    description: 'Reduce bit depth (1–16 bit) and sample rate for lo-fi, vintage or glitchy textures. Live preview + WAV export.',
+    accent: 'var(--color-accent)',
+    ready: true,
+  },
 ]
 </script>
 

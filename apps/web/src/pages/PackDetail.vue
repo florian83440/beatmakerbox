@@ -8,6 +8,7 @@ const route = useRoute()
 const pack = ref<PackDto | null>(null)
 const isLoading = ref(true)
 const error = ref<string | null>(null)
+const errorKind = ref<'unreachable' | 'notfound' | 'api'>('api')
 let controller: AbortController | null = null
 
 const slug = computed(() => String(route.params.slug ?? ''))
@@ -20,10 +21,12 @@ async function load(): Promise<void> {
   pack.value = null
   try {
     pack.value = await getPack(slug.value, controller.signal)
-    if (!pack.value) error.value = 'Pack not found'
+    if (!pack.value) { errorKind.value = 'notfound'; error.value = 'Pack not found' }
   } catch (e) {
     if ((e as Error).name === 'AbortError') return
-    error.value = e instanceof Error ? e.message : 'Failed to load'
+    const msg = e instanceof Error ? e.message : 'Failed to load'
+    errorKind.value = msg === 'aggregator_unreachable' ? 'unreachable' : 'api'
+    error.value = msg
   } finally {
     isLoading.value = false
   }
@@ -80,9 +83,24 @@ const sourceLabel: Record<string, string> = {
 
     <div
       v-else-if="error"
-      class="panel-flat mt-6 border-l-2 border-l-[var(--color-magenta)] px-4 py-3 text-sm text-[var(--color-magenta)]"
+      class="panel mt-6 border-l-2 border-l-[var(--color-magenta)] px-5 py-4"
     >
-      {{ error }}
+      <template v-if="errorKind === 'notfound'">
+        <p class="text-sm font-semibold text-[var(--color-magenta)]">Pack not found</p>
+        <p class="mt-1 text-sm text-[var(--color-text-soft)]">
+          This pack may have been removed or the URL is incorrect.
+        </p>
+      </template>
+      <template v-else-if="errorKind === 'unreachable'">
+        <p class="text-sm font-semibold text-[var(--color-magenta)]">Aggregator not reachable</p>
+        <p class="mt-1 text-sm text-[var(--color-text-soft)]">
+          Start the aggregator locally: <code class="mono">cd apps/aggregator && pnpm dev</code>
+        </p>
+      </template>
+      <template v-else>
+        <p class="text-sm font-semibold text-[var(--color-magenta)]">API error ({{ error }})</p>
+        <p class="mt-1 text-sm text-[var(--color-text-soft)]">Check the aggregator logs.</p>
+      </template>
     </div>
 
     <article v-else-if="pack" class="mt-6 space-y-5">
