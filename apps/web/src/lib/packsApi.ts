@@ -20,6 +20,8 @@ export interface PackDto {
   popularity: number | null
   estimatedBpm: number | null
   estimatedKey: string | null
+  kind: string | null
+  genres: string[]
 }
 
 export interface PacksListResponse {
@@ -36,11 +38,25 @@ export interface SourceInfo {
   count: number
 }
 
+/** A filter facet value (a kind or a genre) with how many packs carry it. */
+export interface FacetItem {
+  id: string
+  label: string
+  count: number
+}
+
+export interface FacetsResponse {
+  kinds: FacetItem[]
+  genres: FacetItem[]
+}
+
 const RAW_BASE = (import.meta.env.VITE_PACKS_API_URL ?? '/api').replace(/\/$/, '')
 
 export interface ListPacksParams {
   source?: string
   q?: string
+  kind?: string
+  genre?: string
   page?: number
   limit?: number
   signal?: AbortSignal
@@ -61,6 +77,8 @@ export async function listPacks(params: ListPacksParams = {}): Promise<PacksList
   const u = new URL(`${RAW_BASE}/packs`, window.location.origin)
   if (params.source) u.searchParams.set('source', params.source)
   if (params.q) u.searchParams.set('q', params.q)
+  if (params.kind) u.searchParams.set('kind', params.kind)
+  if (params.genre) u.searchParams.set('genre', params.genre)
   if (params.page) u.searchParams.set('page', String(params.page))
   if (params.limit) u.searchParams.set('limit', String(params.limit))
 
@@ -83,4 +101,10 @@ export async function listSources(signal?: AbortSignal): Promise<SourceInfo[]> {
   if (!res.ok) throw new Error(`api_${res.status}`)
   const body = (await res.json()) as { sources: SourceInfo[] }
   return body.sources
+}
+
+export async function listFacets(signal?: AbortSignal): Promise<FacetsResponse> {
+  const res = await apiFetch(`${RAW_BASE}/facets`, signal)
+  if (!res.ok) throw new Error(`api_${res.status}`)
+  return (await res.json()) as FacetsResponse
 }

@@ -20,23 +20,10 @@ const nav = [
 
 <template>
   <header class="sticky top-0 z-50 border-b border-[var(--color-edge-soft)] bg-[var(--color-bg)]/85 backdrop-blur">
-    <!-- Studio-bar top — tiny menu bar style -->
-    <div class="border-b border-[var(--color-edge-soft)]/60 bg-[var(--color-bg-2)]/60">
-      <div class="mx-auto flex h-6 max-w-6xl items-center justify-between px-4 sm:px-6">
-        <div class="flex items-center gap-3">
-          <span class="led led-hot"></span>
-          <span class="label !text-[9px]">Beatmakerbox · in-browser audio tools</span>
-        </div>
-        <span class="mono hidden text-[10px] text-[var(--color-text-muted)] sm:inline">v0.1 · build {{ new Date().getFullYear() }}</span>
-      </div>
-    </div>
-
     <!-- Main bar -->
     <div class="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
-      <RouterLink to="/" class="group flex items-center gap-2.5">
-        <div class="flex h-7 w-7 items-center justify-center rounded-md border border-[var(--color-edge)] bg-[var(--color-surface-2)] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-          <span class="font-sans text-base font-extrabold leading-none text-[var(--color-accent)]">b</span>
-        </div>
+      <RouterLink to="/" class="flex items-center gap-2.5">
+        <span class="flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--color-edge)] bg-[var(--color-surface-2)] text-base font-bold leading-none text-[var(--color-accent)]">b</span>
         <span class="text-[15px] font-semibold tracking-tight">
           beatmaker<span class="text-[var(--color-accent)]">box</span>
         </span>

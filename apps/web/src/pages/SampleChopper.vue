@@ -99,7 +99,7 @@ function drawWaveform(): void {
   const slices = chop.slices.value
   if (slices.length === 0) return
   const totalDuration = chop.decoded.value.durationSeconds
-  ctx2d.font = '10px "JetBrains Mono", monospace'
+  ctx2d.font = '10px "General Sans", sans-serif'
 
   for (let i = 0; i < slices.length; i++) {
     const slice = slices[i]

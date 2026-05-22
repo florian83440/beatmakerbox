@@ -14,11 +14,11 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     proxy: {
-      // Dev-only: forward /api/* to the local aggregator (Fastify on :3001).
+      // Dev-only: forward /api/* to the local aggregator (Fastify on :3002).
       // In production the web and the aggregator live on different domains
       // and the frontend talks to the aggregator via VITE_PACKS_API_URL.
       '/api': {
-        target: 'http://localhost:3001',
+        target: 'http://localhost:3002',
         changeOrigin: true,
       },
     },

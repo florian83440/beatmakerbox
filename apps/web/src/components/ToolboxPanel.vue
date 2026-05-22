@@ -130,14 +130,14 @@ const tabs: Array<{ id: ToolboxTab; label: string }> = [
       <div
         v-if="tb.isOpen.value"
         ref="panelEl"
-        class="fixed z-[9999] flex flex-col overflow-hidden rounded-lg border border-[var(--color-edge)] shadow-2xl shadow-black/60"
+        class="fixed z-[9999] flex flex-col overflow-hidden rounded-xl border border-[var(--color-edge)]"
         :style="{
           width: W + 'px',
           maxHeight: H_MAX + 'px',
           left: getPos().x + 'px',
           top: getPos().y + 'px',
           background: 'var(--color-surface)',
-          boxShadow: '0 0 0 1px rgba(255,255,255,0.04) inset, 0 24px 48px -8px rgba(0,0,0,0.7)',
+          boxShadow: '0 16px 40px -12px rgba(0,0,0,0.6)',
           transformOrigin: 'bottom right',
         }"
       >

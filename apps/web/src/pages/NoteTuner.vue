@@ -182,9 +182,6 @@ function reset(): void {
             :style="{
               left: centsPercent + '%',
               background: Math.abs(result.cents) <= 5 ? 'var(--color-lime)' : 'var(--color-magenta)',
-              boxShadow: Math.abs(result.cents) <= 5
-                ? '0 0 14px rgba(163,230,53,0.6)'
-                : '0 0 14px rgba(255,77,141,0.6)',
             }"
           ></div>
           <!-- Labels -->

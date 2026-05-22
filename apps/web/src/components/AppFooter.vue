@@ -38,8 +38,14 @@ import { RouterLink } from 'vue-router'
         </div>
       </div>
 
-      <div class="mt-8 flex flex-col items-center justify-between gap-2 border-t border-[var(--color-edge-soft)] pt-4 text-xs text-[var(--color-text-muted)] sm:flex-row">
-        <p>© {{ new Date().getFullYear() }} Beatmakerbox.</p>
+      <div class="mt-8 flex flex-col items-start justify-between gap-3 border-t border-[var(--color-edge-soft)] pt-4 text-xs text-[var(--color-text-muted)] sm:flex-row sm:items-center">
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <p>© {{ new Date().getFullYear() }} Beatmakerbox.</p>
+          <RouterLink to="/contact" class="transition-colors hover:text-[var(--color-text)]">Contact</RouterLink>
+          <RouterLink to="/terms" class="transition-colors hover:text-[var(--color-text)]">Terms</RouterLink>
+          <RouterLink to="/privacy" class="transition-colors hover:text-[var(--color-text)]">Privacy</RouterLink>
+          <RouterLink to="/legal" class="transition-colors hover:text-[var(--color-text)]">Legal</RouterLink>
+        </div>
         <p class="mono">100% client-side · no tracker · no signup</p>
       </div>
     </div>

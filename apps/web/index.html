@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#161616" />
+    <meta name="theme-color" content="#141414" />
 
     <!-- Title + description per route are injected by useHead() at SSG time;
          the values below are the fallback shown if the head plugin somehow
@@ -12,12 +12,11 @@
     <title>Beatmakerbox</title>
     <meta name="description" content="Free in-browser audio tools for beatmakers." />
 
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap"
-      rel="stylesheet"
-    />
+    <!-- General Sans is self-hosted (see public/fonts) — no external font
+         request, in line with the app's no-tracker promise. Preload the
+         two weights used above the fold: 500 for body, 600 for headings. -->
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/general-sans-500.woff2" crossorigin />
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/general-sans-600.woff2" crossorigin />
   </head>
   <body>
     <div id="app"></div>

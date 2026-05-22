@@ -125,10 +125,6 @@ function onDrop(e: DragEvent): void {
 <style scoped>
 .panel.is-dragging {
   border-color: var(--accent);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 1px 0 rgba(0, 0, 0, 0.4),
-    0 0 0 3px rgba(255, 122, 26, 0.12),
-    0 12px 28px -14px rgba(0, 0, 0, 0.6);
+  background: color-mix(in srgb, var(--accent) 6%, var(--color-surface));
 }
 </style>

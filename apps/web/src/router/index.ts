@@ -68,6 +68,26 @@ export const routes: RouteRecordRaw[] = [
     component: () => import('@/pages/PackDetail.vue'),
   },
   {
+    path: '/contact',
+    name: 'contact',
+    component: () => import('@/pages/Contact.vue'),
+  },
+  {
+    path: '/terms',
+    name: 'terms',
+    component: () => import('@/pages/Terms.vue'),
+  },
+  {
+    path: '/privacy',
+    name: 'privacy',
+    component: () => import('@/pages/Privacy.vue'),
+  },
+  {
+    path: '/legal',
+    name: 'legal',
+    component: () => import('@/pages/Legal.vue'),
+  },
+  {
     path: '/:pathMatch(.*)*',
     redirect: '/',
   },

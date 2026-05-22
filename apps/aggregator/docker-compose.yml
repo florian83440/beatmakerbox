@@ -37,7 +37,7 @@ services:
       - "traefik.http.routers.beatmakerbox-aggregator.entrypoints=websecure"
       - "traefik.http.routers.beatmakerbox-aggregator.tls=true"
       - "traefik.http.routers.beatmakerbox-aggregator.tls.certresolver=le"
-      - "traefik.http.services.beatmakerbox-aggregator.loadbalancer.server.port=3001"
+      - "traefik.http.services.beatmakerbox-aggregator.loadbalancer.server.port=3002"
 
 networks:
   traefik_proxy:

@@ -5,6 +5,7 @@ import { DatabaseSync, type StatementSync, type SQLInputValue } from 'node:sqlit
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { config } from './config.js'
+import { classify } from './classify.js'
 import type { PackDto, PackRow, RawPack, SourceId } from './types.js'
 
 let db: DatabaseSync | null = null
@@ -38,12 +39,68 @@ function migrate(d: DatabaseSync): void {
       popularity    INTEGER,
       estimated_bpm REAL,
       estimated_key TEXT,
+      kind          TEXT,
+      genres        TEXT,
       UNIQUE(source, source_id)
     );
     CREATE INDEX IF NOT EXISTS idx_packs_source       ON packs(source);
     CREATE INDEX IF NOT EXISTS idx_packs_published    ON packs(published_at DESC);
     CREATE INDEX IF NOT EXISTS idx_packs_popularity   ON packs(popularity DESC);
   `)
+
+  // Incremental columns — added to pre-existing databases that predate the
+  // classifier. New databases already get them from the CREATE above.
+  // Must run before the kind index, which references the column.
+  addColumnIfMissing(d, 'kind', 'TEXT')
+  addColumnIfMissing(d, 'genres', 'TEXT')
+  d.exec('CREATE INDEX IF NOT EXISTS idx_packs_kind ON packs(kind)')
+
+  // Backfill: classify rows that have never been classified.
+  const done = runClassification(d, true)
+  if (done > 0) console.log(`[db] classified ${done} existing pack(s)`)
+}
+
+/** Add a column to the packs table only if it isn't there yet. */
+function addColumnIfMissing(d: DatabaseSync, column: string, type: string): void {
+  const cols = d.prepare('PRAGMA table_info(packs)').all() as Array<{ name: string }>
+  if (!cols.some((c) => c.name === column)) {
+    d.exec(`ALTER TABLE packs ADD COLUMN ${column} ${type}`)
+  }
+}
+
+/**
+ * (Re)derive kind + genres for stored packs. `onlyMissing` restricts it to
+ * rows never classified — used for the migration backfill; the full sweep
+ * backs `reclassifyAll()` / `pnpm reclassify`.
+ */
+function runClassification(d: DatabaseSync, onlyMissing: boolean): number {
+  const rows = d
+    .prepare(`SELECT slug, title, tags FROM packs${onlyMissing ? ' WHERE kind IS NULL' : ''}`)
+    .all() as Array<{ slug: string; title: string; tags: string | null }>
+  if (rows.length === 0) return 0
+
+  const upd = d.prepare('UPDATE packs SET kind = $kind, genres = $genres WHERE slug = $slug')
+  d.exec('BEGIN')
+  try {
+    for (const r of rows) {
+      const c = classify(r.title, r.tags ? safeJsonArray(r.tags) : [])
+      upd.run({
+        $slug: r.slug,
+        $kind: c.kind,
+        $genres: c.genres.length ? JSON.stringify(c.genres) : null,
+      })
+    }
+    d.exec('COMMIT')
+  } catch (e) {
+    d.exec('ROLLBACK')
+    throw e
+  }
+  return rows.length
+}
+
+/** Re-classify every stored pack with the current rule tables. */
+export function reclassifyAll(): number {
+  return runClassification(getDb(), false)
 }
 
 /** Convert a title to a stable URL slug. */
@@ -69,11 +126,13 @@ function upsertStatement(): StatementSync {
   _upsert = getDb().prepare(`
     INSERT INTO packs (
       slug, source, source_id, title, description, url, download_url,
-      preview_url, author, tags, metadata, published_at, fetched_at, popularity
+      preview_url, author, tags, metadata, published_at, fetched_at, popularity,
+      kind, genres
     )
     VALUES (
       $slug, $source, $source_id, $title, $description, $url, $download_url,
-      $preview_url, $author, $tags, $metadata, $published_at, $fetched_at, $popularity
+      $preview_url, $author, $tags, $metadata, $published_at, $fetched_at, $popularity,
+      $kind, $genres
     )
     ON CONFLICT(source, source_id) DO UPDATE SET
       title        = excluded.title,
@@ -84,7 +143,9 @@ function upsertStatement(): StatementSync {
       author       = excluded.author,
       tags         = excluded.tags,
       metadata     = excluded.metadata,
-      popularity   = excluded.popularity
+      popularity   = excluded.popularity,
+      kind         = excluded.kind,
+      genres       = excluded.genres
   `)
   return _upsert
 }
@@ -99,6 +160,7 @@ export function upsertPacks(raws: RawPack[]): { inserted: number; updated: numbe
   d.exec('BEGIN')
   try {
     for (const r of raws) {
+      const c = classify(r.title, r.tags ?? [])
       stmt.run({
         $slug: slugify(r.title, `${r.source}:${r.sourceId}`),
         $source: r.source,
@@ -114,6 +176,8 @@ export function upsertPacks(raws: RawPack[]): { inserted: number; updated: numbe
         $published_at: r.publishedAt ?? null,
         $fetched_at: Math.floor(Date.now() / 1000),
         $popularity: r.popularity ?? null,
+        $kind: c.kind,
+        $genres: c.genres.length ? JSON.stringify(c.genres) : null,
       })
     }
     d.exec('COMMIT')
@@ -133,6 +197,8 @@ export function upsertPacks(raws: RawPack[]): { inserted: number; updated: numbe
 export interface ListQuery {
   source?: SourceId
   q?: string
+  kind?: string
+  genre?: string
   limit: number
   offset: number
 }
@@ -153,6 +219,15 @@ export function listPacks(query: ListQuery): ListResult {
   if (query.q) {
     where.push('(title LIKE $q OR description LIKE $q OR author LIKE $q)')
     params.$q = `%${query.q}%`
+  }
+  if (query.kind) {
+    where.push('kind = $kind')
+    params.$kind = query.kind
+  }
+  if (query.genre) {
+    // genres is a JSON array string — match the quoted token inside it.
+    where.push('genres LIKE $genre')
+    params.$genre = `%"${query.genre}"%`
   }
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : ''
 
@@ -187,6 +262,33 @@ export function countBySource(): Array<{ source: SourceId; count: number }> {
   return rows
 }
 
+export function countByKind(): Array<{ kind: string; count: number }> {
+  return getDb()
+    .prepare(`
+      SELECT kind, COUNT(*) AS count FROM packs
+      WHERE kind IS NOT NULL
+      GROUP BY kind ORDER BY count DESC
+    `)
+    .all() as unknown as Array<{ kind: string; count: number }>
+}
+
+export function countByGenre(): Array<{ genre: string; count: number }> {
+  // genres is a JSON array per row — tally in JS to stay independent of the
+  // SQLite JSON extension.
+  const rows = getDb()
+    .prepare('SELECT genres FROM packs WHERE genres IS NOT NULL')
+    .all() as unknown as Array<{ genres: string }>
+  const tally = new Map<string, number>()
+  for (const r of rows) {
+    for (const g of safeJsonArray(r.genres)) {
+      tally.set(g, (tally.get(g) ?? 0) + 1)
+    }
+  }
+  return [...tally.entries()]
+    .map(([genre, count]) => ({ genre, count }))
+    .sort((a, b) => b.count - a.count)
+}
+
 function rowToDto(row: PackRow): PackDto {
   return {
     slug: row.slug,
@@ -204,6 +306,8 @@ function rowToDto(row: PackRow): PackDto {
     popularity: row.popularity,
     estimatedBpm: row.estimated_bpm,
     estimatedKey: row.estimated_key,
+    kind: row.kind,
+    genres: row.genres ? safeJsonArray(row.genres) : [],
   }
 }
 

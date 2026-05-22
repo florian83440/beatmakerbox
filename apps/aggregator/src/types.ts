@@ -1,16 +1,13 @@
 // Shared types between sources, jobs, db and API.
 
-/** Identifier of an external source. */
+/** Identifier of an external source. RSS feeds use the `rss-<slug>` form. */
 export type SourceId =
   | 'reddit'
   | 'freesound'
-  | 'rss-cymatics'
-  | 'rss-bvker'
-  | 'rss-producerspot'
-  | 'rss-cr2'
   | 'youtube'
-  | 'bandcamp'
   | 'archive-org'
+  | 'bandcamp'
+  | `rss-${string}`
 
 /** Output of a source fetcher — normalized into a common shape. */
 export interface RawPack {
@@ -55,6 +52,8 @@ export interface PackRow {
   popularity: number | null
   estimated_bpm: number | null
   estimated_key: string | null
+  kind: string | null          // classified pack type
+  genres: string | null        // JSON array of classified genres
 }
 
 /** Pack as exposed on the public API (decoded JSON fields, camelCase). */
@@ -74,4 +73,8 @@ export interface PackDto {
   popularity: number | null
   estimatedBpm: number | null
   estimatedKey: string | null
+  /** Classified pack type — see classify.ts. Null when nothing matched. */
+  kind: string | null
+  /** Classified genres — possibly empty. */
+  genres: string[]
 }

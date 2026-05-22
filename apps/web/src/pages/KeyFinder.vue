@@ -178,7 +178,7 @@ function reset(): void {
               <div
                 class="absolute bottom-0 w-full rounded-sm transition-all"
                 :class="i === tonicIndex ? 'bg-[var(--color-accent)]' : 'bg-[var(--color-surface-3)]'"
-                :style="{ height: `${(value / maxChroma) * 100}%`, boxShadow: i === tonicIndex ? '0 0 12px var(--color-accent-glow)' : 'none' }"
+                :style="{ height: `${(value / maxChroma) * 100}%` }"
               />
             </div>
             <span

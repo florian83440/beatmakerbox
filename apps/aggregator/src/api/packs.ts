@@ -1,8 +1,9 @@
 // HTTP routes for /api/packs.
 
 import type { FastifyInstance } from 'fastify'
-import { countBySource, getPackBySlug, listPacks } from '../db.js'
+import { countByGenre, countByKind, countBySource, getPackBySlug, listPacks } from '../db.js'
 import { sources } from '../sources/index.js'
+import { GENRE_LABELS, KIND_LABELS, isKnownGenre, isKnownKind } from '../classify.js'
 import type { SourceId } from '../types.js'
 
 const KNOWN_SOURCES = new Set(sources.map((s) => s.id))
@@ -16,10 +17,14 @@ export async function registerPacksRoutes(app: FastifyInstance): Promise<void> {
       ? (q.source as SourceId)
       : undefined
     const search = q.q?.trim() || undefined
+    const kind = q.kind && isKnownKind(q.kind) ? q.kind : undefined
+    const genre = q.genre && isKnownGenre(q.genre) ? q.genre : undefined
 
     const result = listPacks({
       source,
       q: search,
+      kind,
+      genre,
       limit,
       offset: (page - 1) * limit,
     })
@@ -54,6 +59,24 @@ export async function registerPacksRoutes(app: FastifyInstance): Promise<void> {
         id: s.id,
         label: s.label,
         count: dict[s.id] ?? 0,
+      })),
+    }
+  })
+
+  // Filter facets — the kinds and genres actually present in the DB, with
+  // counts, so the frontend can render only meaningful filter chips.
+  app.get('/api/facets', async (_req, reply) => {
+    reply.header('Cache-Control', 'public, max-age=60')
+    return {
+      kinds: countByKind().map((k) => ({
+        id: k.kind,
+        label: KIND_LABELS[k.kind as keyof typeof KIND_LABELS] ?? k.kind,
+        count: k.count,
+      })),
+      genres: countByGenre().map((g) => ({
+        id: g.genre,
+        label: GENRE_LABELS[g.genre] ?? g.genre,
+        count: g.count,
       })),
     }
   })

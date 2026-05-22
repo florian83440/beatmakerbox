@@ -33,10 +33,10 @@ COPY --from=build /workspace/apps/aggregator/node_modules   ./node_modules
 RUN mkdir -p /app/data && chown -R node:node /app
 USER node
 
-EXPOSE 3001
+EXPOSE 3002
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD wget -qO- http://localhost:3001/api/healthz >/dev/null || exit 1
+  CMD wget -qO- http://localhost:3002/api/healthz >/dev/null || exit 1
 
 ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["node", "--enable-source-maps", "dist/server.js"]

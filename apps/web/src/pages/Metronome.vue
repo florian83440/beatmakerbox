@@ -165,9 +165,6 @@ const subIndices = computed(() => Array.from({ length: metro.subdivision.value }
                   ? 'border-[var(--color-violet)]/40 bg-[var(--color-surface-2)]'
                   : 'border-[var(--color-edge)] bg-[var(--color-surface-2)]')
           "
-          :style="metro.currentBeat.value === i && metro.isPlaying.value
-            ? 'box-shadow: 0 0 16px rgba(167,139,250,0.45)'
-            : ''"
         >
           <span
             class="font-mono text-sm font-bold"

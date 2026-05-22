@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useHead } from '@unhead/vue'
-import { listPacks, listSources, type PackDto, type SourceInfo } from '@/lib/packsApi'
+import { listPacks, listSources, listFacets, type PackDto, type SourceInfo, type FacetItem } from '@/lib/packsApi'
 
 useHead({
   title: 'Free Sample Packs — Daily aggregator · Beatmakerbox',
@@ -21,11 +21,18 @@ const page = ref(1)
 const limit = 24
 const sources = ref<SourceInfo[]>([])
 const activeSource = ref<string | null>(null)
+const kinds = ref<FacetItem[]>([])
+const genres = ref<FacetItem[]>([])
+const activeKind = ref<string | null>(null)
+const activeGenre = ref<string | null>(null)
 const query = ref('')
 const debouncedQuery = ref('')
 const isLoading = ref(false)
 const error = ref<string | null>(null)
 const errorKind = ref<'unreachable' | 'api' | null>(null)
+
+// Slugs whose thumbnail failed to load — fall back to the placeholder.
+const broken = reactive(new Set<string>())
 
 let activeController: AbortController | null = null
 let debounceHandle: number | null = null
@@ -49,6 +56,8 @@ async function fetchData(): Promise<void> {
       page: page.value,
       limit,
       source: activeSource.value ?? undefined,
+      kind: activeKind.value ?? undefined,
+      genre: activeGenre.value ?? undefined,
       q: debouncedQuery.value || undefined,
       signal: activeController.signal,
     })
@@ -69,12 +78,16 @@ async function fetchData(): Promise<void> {
   }
 }
 
-watch([page, activeSource, debouncedQuery], () => { void fetchData() })
+watch([page, activeSource, activeKind, activeGenre, debouncedQuery], () => { void fetchData() })
 
 onMounted(async () => {
+  // Sources + facets are best-effort — the grid still works without them.
   try {
-    sources.value = await listSources()
-  } catch { /* sources are best-effort */ }
+    const [src, facets] = await Promise.all([listSources(), listFacets()])
+    sources.value = src
+    kinds.value = facets.kinds
+    genres.value = facets.genres
+  } catch { /* ignore */ }
   await fetchData()
 })
 
@@ -88,9 +101,24 @@ function selectSource(src: string | null): void {
   page.value = 1
 }
 
+function selectKind(k: string | null): void {
+  activeKind.value = k
+  page.value = 1
+}
+
+function selectGenre(g: string | null): void {
+  activeGenre.value = g
+  page.value = 1
+}
+
+function kindLabel(id: string | null): string {
+  if (!id) return ''
+  return kinds.value.find((k) => k.id === id)?.label ?? id
+}
+
 function formatDate(unix: number | null): string {
   if (!unix) return '—'
-  return new Date(unix * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+  return new Date(unix * 1000).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 function sourceLabel(id: string): string {
@@ -102,21 +130,26 @@ function sourceAccent(id: string): string {
   const map: Record<string, string> = {
     'reddit': 'var(--color-accent)',
     'freesound': 'var(--color-cyan)',
-    'rss-cymatics': 'var(--color-lime)',
-    'rss-bvker': 'var(--color-magenta)',
-    'rss-producerspot': 'var(--color-yellow)',
-    'rss-cr2': 'var(--color-violet)',
     'youtube': 'var(--color-magenta)',
     'archive-org': 'var(--color-teal)',
     'bandcamp': 'var(--color-violet)',
+    'rss-bpb': 'var(--color-lime)',
+    'rss-4drumkits': 'var(--color-yellow)',
   }
   return map[id] ?? 'var(--color-text-soft)'
 }
 
-const hasFilters = computed(() => activeSource.value !== null || debouncedQuery.value.length > 0)
+const hasFilters = computed(() =>
+  activeSource.value !== null ||
+  activeKind.value !== null ||
+  activeGenre.value !== null ||
+  debouncedQuery.value.length > 0,
+)
 
 function resetFilters(): void {
   activeSource.value = null
+  activeKind.value = null
+  activeGenre.value = null
   query.value = ''
   debouncedQuery.value = ''
   page.value = 1
@@ -193,6 +226,62 @@ function resetFilters(): void {
       </button>
     </div>
 
+    <!-- Type filter chips -->
+    <div v-if="kinds.length" class="panel mb-3 flex flex-wrap items-center gap-2 p-3">
+      <span class="label mr-2">Type</span>
+      <button
+        type="button"
+        class="rounded-md border px-2.5 py-1 text-xs font-medium transition-all"
+        :class="activeKind === null
+          ? 'border-[var(--color-text)] bg-[var(--color-text)]/10 text-[var(--color-text)]'
+          : 'border-[var(--color-edge)] bg-[var(--color-surface-2)] text-[var(--color-text-soft)] hover:bg-[var(--color-surface-3)]'"
+        @click="selectKind(null)"
+      >
+        All
+      </button>
+      <button
+        v-for="k in kinds"
+        :key="k.id"
+        type="button"
+        class="rounded-md border px-2.5 py-1 text-xs font-medium transition-all"
+        :class="activeKind === k.id
+          ? 'border-[var(--color-emerald)] bg-[var(--color-emerald)]/12 text-[var(--color-emerald)]'
+          : 'border-[var(--color-edge)] bg-[var(--color-surface-2)] text-[var(--color-text-soft)] hover:bg-[var(--color-surface-3)]'"
+        @click="selectKind(k.id)"
+      >
+        {{ k.label }}
+        <span class="mono ml-1 text-[10px] opacity-70">{{ k.count }}</span>
+      </button>
+    </div>
+
+    <!-- Genre filter chips -->
+    <div v-if="genres.length" class="panel mb-3 flex flex-wrap items-center gap-2 p-3">
+      <span class="label mr-2">Genre</span>
+      <button
+        type="button"
+        class="rounded-md border px-2.5 py-1 text-xs font-medium transition-all"
+        :class="activeGenre === null
+          ? 'border-[var(--color-text)] bg-[var(--color-text)]/10 text-[var(--color-text)]'
+          : 'border-[var(--color-edge)] bg-[var(--color-surface-2)] text-[var(--color-text-soft)] hover:bg-[var(--color-surface-3)]'"
+        @click="selectGenre(null)"
+      >
+        All
+      </button>
+      <button
+        v-for="g in genres"
+        :key="g.id"
+        type="button"
+        class="rounded-md border px-2.5 py-1 text-xs font-medium transition-all"
+        :class="activeGenre === g.id
+          ? 'border-[var(--color-emerald)] bg-[var(--color-emerald)]/12 text-[var(--color-emerald)]'
+          : 'border-[var(--color-edge)] bg-[var(--color-surface-2)] text-[var(--color-text-soft)] hover:bg-[var(--color-surface-3)]'"
+        @click="selectGenre(g.id)"
+      >
+        {{ g.label }}
+        <span class="mono ml-1 text-[10px] opacity-70">{{ g.count }}</span>
+      </button>
+    </div>
+
     <div
       v-if="error"
       class="panel mb-4 border-l-2 border-l-[var(--color-magenta)] px-5 py-4"
@@ -205,7 +294,7 @@ function resetFilters(): void {
         </p>
         <pre class="screen mono mt-3 overflow-x-auto px-4 py-3 text-xs text-[var(--color-text)]">cd apps/aggregator
 cp .env.example .env   # first time only
-pnpm dev               # listens on :3001, proxied by Vite</pre>
+pnpm dev               # listens on :3002, proxied by Vite</pre>
         <p class="mt-3 text-xs text-[var(--color-text-muted)]">
           In production, set <code class="mono">VITE_PACKS_API_URL</code> to your aggregator origin at build time.
         </p>
@@ -222,7 +311,7 @@ pnpm dev               # listens on :3001, proxied by Vite</pre>
 
     <!-- Skeleton while loading + empty state -->
     <div v-if="isLoading && packs.length === 0" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      <div v-for="i in 6" :key="i" class="panel h-44 animate-pulse"></div>
+      <div v-for="i in 6" :key="i" class="panel h-72 animate-pulse"></div>
     </div>
 
     <div v-else-if="!isLoading && packs.length === 0" class="panel py-16 text-center">
@@ -238,36 +327,63 @@ pnpm dev               # listens on :3001, proxied by Vite</pre>
         v-for="pack in packs"
         :key="pack.slug"
         :to="`/packs/${pack.slug}`"
-        class="panel group relative flex flex-col p-4 transition-all hover:-translate-y-0.5"
+        class="panel group relative flex flex-col overflow-hidden transition-all hover:-translate-y-0.5"
       >
-        <div class="mb-2 flex items-center justify-between gap-2">
-          <span
-            class="mono text-[10px] font-semibold uppercase tracking-wider"
-            :style="{ color: sourceAccent(pack.source) }"
-          >
-            {{ sourceLabel(pack.source) }}
-          </span>
-          <span class="mono text-[10px] text-[var(--color-text-muted)]">
-            {{ formatDate(pack.publishedAt) }}
-          </span>
+        <!-- Thumbnail -->
+        <div class="aspect-[16/9] w-full overflow-hidden border-b border-[var(--color-edge-soft)] bg-[var(--color-bg-2)]">
+          <img
+            v-if="pack.previewUrl && !broken.has(pack.slug)"
+            :src="pack.previewUrl"
+            alt=""
+            loading="lazy"
+            class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+            @error="broken.add(pack.slug)"
+          />
+          <div v-else class="flex h-full w-full items-center justify-center">
+            <svg class="h-8 w-8 text-[var(--color-text-faint)]" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 18V5l12-2v13M9 18a3 3 0 11-6 0 3 3 0 016 0zm12-2a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </div>
         </div>
 
-        <h3 class="line-clamp-2 text-base font-semibold leading-snug text-[var(--color-text)] group-hover:text-[var(--color-emerald)]">
-          {{ pack.title }}
-        </h3>
+        <div class="flex flex-1 flex-col p-4">
+          <div class="mb-2 flex items-center justify-between gap-2">
+            <span class="flex min-w-0 items-center gap-1.5">
+              <span
+                class="truncate text-[11px] font-semibold"
+                :style="{ color: sourceAccent(pack.source) }"
+              >
+                {{ sourceLabel(pack.source) }}
+              </span>
+              <span
+                v-if="pack.kind"
+                class="shrink-0 rounded border border-[var(--color-edge-soft)] px-1.5 py-0.5 text-[10px] text-[var(--color-text-soft)]"
+              >
+                {{ kindLabel(pack.kind) }}
+              </span>
+            </span>
+            <span class="mono shrink-0 text-[10px] text-[var(--color-text-muted)]">
+              {{ formatDate(pack.publishedAt) }}
+            </span>
+          </div>
 
-        <p v-if="pack.description" class="mt-2 line-clamp-2 flex-1 text-sm text-[var(--color-text-soft)]">
-          {{ pack.description }}
-        </p>
-        <p v-else class="mt-2 flex-1 text-sm text-[var(--color-text-muted)] italic">
-          No description
-        </p>
+          <h3 class="line-clamp-2 text-base font-semibold leading-snug text-[var(--color-text)] group-hover:text-[var(--color-emerald)]">
+            {{ pack.title }}
+          </h3>
 
-        <div class="mt-3 flex items-center justify-between text-xs">
-          <span v-if="pack.author" class="mono text-[var(--color-text-muted)]">{{ pack.author }}</span>
-          <span v-if="pack.popularity !== null" class="mono text-[var(--color-text-muted)]">
-            ▲ {{ pack.popularity }}
-          </span>
+          <p v-if="pack.description" class="mt-2 line-clamp-2 flex-1 text-sm text-[var(--color-text-soft)]">
+            {{ pack.description }}
+          </p>
+          <p v-else class="mt-2 flex-1 text-sm text-[var(--color-text-muted)] italic">
+            No description
+          </p>
+
+          <div class="mt-3 flex items-center justify-between text-xs">
+            <span v-if="pack.author" class="mono truncate text-[var(--color-text-muted)]">{{ pack.author }}</span>
+            <span v-if="pack.popularity !== null" class="mono shrink-0 text-[var(--color-text-muted)]">
+              ▲ {{ pack.popularity }}
+            </span>
+          </div>
         </div>
       </RouterLink>
     </div>

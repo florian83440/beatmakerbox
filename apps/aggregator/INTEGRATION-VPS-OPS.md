@@ -45,7 +45,7 @@ override the deploy steps in `apps.json` (see §8 below).
 - External network: `traefik_proxy` (same one as the web app)
 - Labels in `docker-compose.yml` (HTTPS + HTTP→HTTPS redirect)
 - Domain via `AGGREGATOR_DOMAIN` env var (e.g. `api.beatmakerbox.com`)
-- Internal port: **3001**
+- Internal port: **3002**
 
 ## 6. Healthcheck
 
@@ -80,7 +80,7 @@ See `.env.example` for the full list.
   "envFiles": ["/opt/apps/beatmakerbox-aggregator/.env"],
   "routing": {
     "domains": ["${AGGREGATOR_DOMAIN}"],
-    "internalPort": 3001,
+    "internalPort": 3002,
     "container": "beatmakerbox-aggregator-1"
   },
   "healthchecks": [

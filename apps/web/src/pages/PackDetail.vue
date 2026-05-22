@@ -6,6 +6,7 @@ import { getPack, type PackDto } from '@/lib/packsApi'
 
 const route = useRoute()
 const pack = ref<PackDto | null>(null)
+const imgBroken = ref(false)
 const isLoading = ref(true)
 const error = ref<string | null>(null)
 const errorKind = ref<'unreachable' | 'notfound' | 'api'>('api')
@@ -19,6 +20,7 @@ async function load(): Promise<void> {
   isLoading.value = true
   error.value = null
   pack.value = null
+  imgBroken.value = false
   try {
     pack.value = await getPack(slug.value, controller.signal)
     if (!pack.value) { errorKind.value = 'notfound'; error.value = 'Pack not found' }
@@ -53,7 +55,7 @@ useHead(() => ({
 
 function formatDate(unix: number | null): string {
   if (!unix) return '—'
-  return new Date(unix * 1000).toLocaleDateString(undefined, {
+  return new Date(unix * 1000).toLocaleDateString('en-US', {
     day: 'numeric', month: 'long', year: 'numeric',
   })
 }
@@ -61,14 +63,56 @@ function formatDate(unix: number | null): string {
 const sourceLabel: Record<string, string> = {
   'reddit': 'Reddit',
   'freesound': 'Freesound.org',
-  'rss-cymatics': 'Cymatics',
-  'rss-bvker': 'BVKER',
-  'rss-producerspot': 'ProducerSpot',
-  'rss-cr2': 'Cr2 Records',
   'youtube': 'YouTube',
   'archive-org': 'Internet Archive',
   'bandcamp': 'Bandcamp',
+  'rss-bpb': 'Bedroom Producers Blog',
+  'rss-4drumkits': '4drumkits',
 }
+
+// Display labels for the classified kind / genre ids — overrides for the
+// cases plain title-casing gets wrong, falls back to title-casing otherwise.
+const LABEL_OVERRIDES: Record<string, string> = {
+  '808': '808s',
+  'drum-kit': 'Drum Kit',
+  'loop-kit': 'Loop Kit',
+  'one-shots': 'One-Shots',
+  'sample-pack': 'Sample Pack',
+  'preset-pack': 'Presets / VST',
+  'midi': 'MIDI',
+  'lo-fi': 'Lo-Fi',
+  'hip-hop': 'Hip-Hop',
+  'boom-bap': 'Boom Bap',
+  'rnb': 'R&B',
+  'dnb': 'DnB',
+  'edm': 'EDM',
+  'jersey-club': 'Jersey Club',
+  'future-bass': 'Future Bass',
+}
+
+function label(id: string): string {
+  return LABEL_OVERRIDES[id] ?? id.replace(/(^|[\s-])\w/g, (m) => m.toUpperCase())
+}
+
+// Playable audio preview — currently only Freesound packs carry one.
+const audioPreview = computed<string | null>(() => {
+  const v = pack.value?.metadata?.audioPreview
+  return typeof v === 'string' ? v : null
+})
+
+// Sound license (Freesound) — must be credited per the Freesound API ToU.
+function licenseLabel(url: string): string {
+  const u = url.toLowerCase()
+  if (u.includes('/zero/') || u.includes('publicdomain')) return 'CC0'
+  const m = u.match(/licenses\/([a-z+-]+)\/([0-9.]+)/)
+  if (m) return `CC ${m[1].toUpperCase()} ${m[2]}`
+  return 'Custom license'
+}
+
+const license = computed<{ label: string; url: string } | null>(() => {
+  const v = pack.value?.metadata?.license
+  return typeof v === 'string' && v ? { label: licenseLabel(v), url: v } : null
+})
 </script>
 
 <template>
@@ -104,11 +148,32 @@ const sourceLabel: Record<string, string> = {
     </div>
 
     <article v-else-if="pack" class="mt-6 space-y-5">
-      <header class="panel p-6 sm:p-8">
-        <div class="mb-3 flex items-center gap-2">
+      <header class="panel overflow-hidden">
+        <div
+          v-if="pack.previewUrl && !imgBroken"
+          class="aspect-[2/1] w-full border-b border-[var(--color-edge-soft)] bg-[var(--color-bg-2)]"
+        >
+          <img
+            :src="pack.previewUrl"
+            alt=""
+            class="h-full w-full object-cover"
+            @error="imgBroken = true"
+          />
+        </div>
+        <div class="p-6 sm:p-8">
+        <div class="mb-3 flex flex-wrap items-center gap-2">
           <span class="chip" style="color: var(--color-emerald); border-color: rgba(16,185,129,0.3); background: rgba(16,185,129,0.14);">
             {{ sourceLabel[pack.source] ?? pack.source }}
           </span>
+          <span v-if="pack.kind" class="chip">{{ label(pack.kind) }}</span>
+          <a
+            v-if="license"
+            :href="license.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="chip transition-colors hover:border-[var(--color-text-faint)] hover:text-[var(--color-text)]"
+            title="Sound license — see terms"
+          >{{ license.label }}</a>
           <span v-if="pack.popularity !== null" class="chip">▲ {{ pack.popularity }}</span>
           <span class="mono ml-auto text-[10px] text-[var(--color-text-muted)]">
             Published {{ formatDate(pack.publishedAt) }}
@@ -118,7 +183,23 @@ const sourceLabel: Record<string, string> = {
         <p v-if="pack.author" class="mono mt-2 text-sm text-[var(--color-text-muted)]">
           by {{ pack.author }}
         </p>
+        <div v-if="pack.genres.length" class="mt-3 flex flex-wrap gap-1.5">
+          <span
+            v-for="g in pack.genres"
+            :key="g"
+            class="chip"
+            style="color: var(--color-emerald); border-color: rgba(16,185,129,0.3); background: rgba(16,185,129,0.1);"
+          >
+            {{ label(g) }}
+          </span>
+        </div>
+        </div>
       </header>
+
+      <div v-if="audioPreview" class="panel p-6">
+        <p class="label mb-3">Audio preview</p>
+        <audio :src="audioPreview" controls preload="none" class="w-full" />
+      </div>
 
       <div v-if="pack.description" class="panel p-6">
         <p class="label mb-3">Description</p>

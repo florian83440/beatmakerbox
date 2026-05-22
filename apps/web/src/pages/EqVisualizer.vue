@@ -139,7 +139,7 @@ function drawAll(): void {
   ctx2d.strokeStyle = 'rgba(255,255,255,0.05)'
   ctx2d.fillStyle = 'rgba(255,255,255,0.22)'
   ctx2d.lineWidth = 1
-  ctx2d.font = '10px "JetBrains Mono", monospace'
+  ctx2d.font = '10px "General Sans", sans-serif'
 
   const gridFreqs = [50, 100, 200, 500, 1000, 2000, 5000, 10000]
   for (const f of gridFreqs) {
@@ -217,11 +217,8 @@ function drawAll(): void {
       else ctx2d.lineTo(x, y)
     }
     ctx2d.strokeStyle = '#ff7a1a'
-    ctx2d.lineWidth = 1.8
-    ctx2d.shadowColor = 'rgba(255,122,26,0.45)'
-    ctx2d.shadowBlur = 8
+    ctx2d.lineWidth = 2
     ctx2d.stroke()
-    ctx2d.shadowBlur = 0
   }
 
   // --- 4. Cutoff markers (dashed vertical lines for HPF/LPF/notch/bandpass) ---
@@ -269,7 +266,7 @@ function drawAll(): void {
 
     // Index inside
     ctx2d.fillStyle = '#0a0a0a'
-    ctx2d.font = 'bold 9px "JetBrains Mono", monospace'
+    ctx2d.font = 'bold 9px "General Sans", sans-serif'
     ctx2d.textAlign = 'center'
     ctx2d.textBaseline = 'middle'
     ctx2d.fillText(`${i + 1}`, x, y + 0.5)
@@ -281,7 +278,7 @@ function drawAll(): void {
       const tip = isCutoffType(band.type)
         ? `${TYPE_ABBR[band.type]} · ${band.label} · Q ${band.q.toFixed(2)}`
         : `${band.label} · Q ${band.q.toFixed(1)} · ${band.gain > 0 ? '+' : ''}${band.gain.toFixed(1)} dB`
-      ctx2d.font = '10px "JetBrains Mono", monospace'
+      ctx2d.font = '10px "General Sans", sans-serif'
       const tipW = ctx2d.measureText(tip).width + 10
       const tipH = 18
       let tipX = x - tipW / 2
