@@ -1,0 +1,44 @@
+# Beatmakerbox aggregator — pulls free sample packs from public sources
+# and exposes them via /api/packs. Fastify + better-sqlite3 + node-cron.
+#
+# Build context MUST be the monorepo root (.. relative to this file) because
+# the Dockerfile copies workspaces (packages/dsp + apps/aggregator).
+#
+# vps-ops naming convention: <slug>-<role>-<index>
+# → "beatmakerbox-aggregator-1".
+
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: apps/aggregator/Dockerfile
+    image: beatmakerbox-aggregator:latest
+    container_name: beatmakerbox-aggregator-1
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    networks:
+      - traefik_proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik_proxy"
+
+      # HTTP → HTTPS redirect
+      - "traefik.http.routers.beatmakerbox-aggregator-http.rule=Host(`${AGGREGATOR_DOMAIN}`)"
+      - "traefik.http.routers.beatmakerbox-aggregator-http.entrypoints=web"
+      - "traefik.http.routers.beatmakerbox-aggregator-http.middlewares=beatmakerbox-aggregator-redirect"
+      - "traefik.http.middlewares.beatmakerbox-aggregator-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.beatmakerbox-aggregator-redirect.redirectscheme.permanent=true"
+
+      # HTTPS router
+      - "traefik.http.routers.beatmakerbox-aggregator.rule=Host(`${AGGREGATOR_DOMAIN}`)"
+      - "traefik.http.routers.beatmakerbox-aggregator.entrypoints=websecure"
+      - "traefik.http.routers.beatmakerbox-aggregator.tls=true"
+      - "traefik.http.routers.beatmakerbox-aggregator.tls.certresolver=le"
+      - "traefik.http.services.beatmakerbox-aggregator.loadbalancer.server.port=3001"
+
+networks:
+  traefik_proxy:
+    external: true

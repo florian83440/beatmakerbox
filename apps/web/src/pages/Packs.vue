@@ -1,0 +1,280 @@
+<script setup lang="ts">
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { RouterLink } from 'vue-router'
+import { useHead } from '@unhead/vue'
+import { listPacks, listSources, type PackDto, type SourceInfo } from '@/lib/packsApi'
+
+useHead({
+  title: 'Free Sample Packs — Daily aggregator · Beatmakerbox',
+  meta: [
+    { name: 'description', content: 'Browse free sample packs, drum kits, loops and 808s aggregated daily from Reddit, Freesound, producer blogs and YouTube. Filter by source, search by name.' },
+    { property: 'og:title', content: 'Free Sample Packs — Daily aggregator' },
+    { property: 'og:description', content: 'Free sample packs aggregated from Reddit, Freesound, blogs and YouTube. New packs every day.' },
+    { property: 'og:type', content: 'website' },
+  ],
+})
+
+const packs = ref<PackDto[]>([])
+const total = ref(0)
+const pages = ref(1)
+const page = ref(1)
+const limit = 24
+const sources = ref<SourceInfo[]>([])
+const activeSource = ref<string | null>(null)
+const query = ref('')
+const debouncedQuery = ref('')
+const isLoading = ref(false)
+const error = ref<string | null>(null)
+
+let activeController: AbortController | null = null
+let debounceHandle: number | null = null
+
+watch(query, (v) => {
+  if (debounceHandle !== null) clearTimeout(debounceHandle)
+  debounceHandle = window.setTimeout(() => {
+    debouncedQuery.value = v.trim()
+    page.value = 1
+  }, 280)
+})
+
+async function fetchData(): Promise<void> {
+  if (activeController) activeController.abort()
+  activeController = new AbortController()
+  isLoading.value = true
+  error.value = null
+  try {
+    const result = await listPacks({
+      page: page.value,
+      limit,
+      source: activeSource.value ?? undefined,
+      q: debouncedQuery.value || undefined,
+      signal: activeController.signal,
+    })
+    packs.value = result.packs
+    total.value = result.total
+    pages.value = result.pages
+  } catch (e) {
+    if ((e as Error).name === 'AbortError') return
+    error.value = e instanceof Error ? e.message : 'Failed to load packs'
+  } finally {
+    isLoading.value = false
+  }
+}
+
+watch([page, activeSource, debouncedQuery], () => { void fetchData() })
+
+onMounted(async () => {
+  try {
+    sources.value = await listSources()
+  } catch { /* sources are best-effort */ }
+  await fetchData()
+})
+
+onBeforeUnmount(() => {
+  if (activeController) activeController.abort()
+  if (debounceHandle !== null) clearTimeout(debounceHandle)
+})
+
+function selectSource(src: string | null): void {
+  activeSource.value = src
+  page.value = 1
+}
+
+function formatDate(unix: number | null): string {
+  if (!unix) return '—'
+  return new Date(unix * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+function sourceLabel(id: string): string {
+  return sources.value.find((s) => s.id === id)?.label ?? id
+}
+
+function sourceAccent(id: string): string {
+  // Tone-mapped per source — keeps the FL-style multi-color identity.
+  const map: Record<string, string> = {
+    'reddit': 'var(--color-accent)',
+    'freesound': 'var(--color-cyan)',
+    'rss-cymatics': 'var(--color-lime)',
+    'rss-bvker': 'var(--color-magenta)',
+    'rss-producerspot': 'var(--color-yellow)',
+    'rss-cr2': 'var(--color-violet)',
+    'youtube': 'var(--color-magenta)',
+    'archive-org': 'var(--color-teal)',
+    'bandcamp': 'var(--color-violet)',
+  }
+  return map[id] ?? 'var(--color-text-soft)'
+}
+
+const hasFilters = computed(() => activeSource.value !== null || debouncedQuery.value.length > 0)
+
+function resetFilters(): void {
+  activeSource.value = null
+  query.value = ''
+  debouncedQuery.value = ''
+  page.value = 1
+}
+</script>
+
+<template>
+  <div class="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
+    <header class="mb-8 flex flex-col items-start gap-3 sm:mb-10">
+      <div class="flex items-center gap-2">
+        <span class="chip" style="background: rgba(16,185,129,0.14); border-color: rgba(16,185,129,0.3); color: var(--color-emerald);">tool · 07</span>
+        <span class="chip">aggregated daily</span>
+        <span class="chip">{{ total }} packs</span>
+      </div>
+      <h1 class="text-4xl font-bold tracking-tight sm:text-5xl">
+        Free Sample <span class="text-[var(--color-emerald)]">Packs</span>
+      </h1>
+      <p class="max-w-2xl text-[var(--color-text-soft)]">
+        Drum kits, loops, 808s and one-shots aggregated daily from Reddit,
+        Freesound, producer blogs and YouTube. Filter, search, click through to the original source.
+      </p>
+    </header>
+
+    <!-- Toolbar: search + source chips -->
+    <div class="panel mb-3 flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
+      <div class="relative flex-1">
+        <svg class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-muted)]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="7" />
+          <path d="m20 20-3-3" stroke-linecap="round" />
+        </svg>
+        <input
+          v-model="query"
+          type="search"
+          placeholder="Search packs, e.g. trap, lo-fi, drill, 808..."
+          class="w-full rounded-md border border-[var(--color-edge)] bg-[var(--color-surface-2)] py-2 pl-9 pr-3 text-sm text-[var(--color-text)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-emerald)] focus:outline-none"
+        />
+      </div>
+      <button
+        v-if="hasFilters"
+        type="button"
+        class="btn-ghost text-xs"
+        @click="resetFilters"
+      >
+        Reset filters
+      </button>
+    </div>
+
+    <!-- Source filter chips -->
+    <div class="panel mb-3 flex flex-wrap items-center gap-2 p-3">
+      <span class="label mr-2">Source</span>
+      <button
+        type="button"
+        class="rounded-md border px-2.5 py-1 text-xs font-medium transition-all"
+        :class="activeSource === null
+          ? 'border-[var(--color-text)] bg-[var(--color-text)]/10 text-[var(--color-text)]'
+          : 'border-[var(--color-edge)] bg-[var(--color-surface-2)] text-[var(--color-text-soft)] hover:bg-[var(--color-surface-3)]'"
+        @click="selectSource(null)"
+      >
+        All
+      </button>
+      <button
+        v-for="src in sources"
+        :key="src.id"
+        type="button"
+        class="rounded-md border px-2.5 py-1 text-xs font-medium transition-all"
+        :class="activeSource === src.id
+          ? 'border-[var(--color-text)] bg-[var(--color-text)]/10 text-[var(--color-text)]'
+          : 'border-[var(--color-edge)] bg-[var(--color-surface-2)] text-[var(--color-text-soft)] hover:bg-[var(--color-surface-3)]'"
+        :style="activeSource === src.id ? `color: ${sourceAccent(src.id)}; border-color: ${sourceAccent(src.id)};` : ''"
+        @click="selectSource(src.id)"
+      >
+        {{ src.label }}
+        <span class="mono ml-1 text-[10px] opacity-70">{{ src.count }}</span>
+      </button>
+    </div>
+
+    <div
+      v-if="error"
+      class="panel-flat mb-4 border-l-2 border-l-[var(--color-magenta)] px-4 py-3 text-sm text-[var(--color-magenta)]"
+    >
+      Couldn't reach the packs API: {{ error }}.<br />
+      Set <code class="mono">VITE_PACKS_API_URL</code> at build time (e.g. <code class="mono">https://api.beatmakerbox.com</code>).
+    </div>
+
+    <!-- Skeleton while loading + empty state -->
+    <div v-if="isLoading && packs.length === 0" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div v-for="i in 6" :key="i" class="panel h-44 animate-pulse"></div>
+    </div>
+
+    <div v-else-if="!isLoading && packs.length === 0" class="panel py-16 text-center">
+      <p class="text-[var(--color-text-soft)]">No packs match your filters.</p>
+      <button v-if="hasFilters" type="button" class="btn-ghost mt-4" @click="resetFilters">
+        Reset filters
+      </button>
+    </div>
+
+    <!-- Grid -->
+    <div v-else class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <RouterLink
+        v-for="pack in packs"
+        :key="pack.slug"
+        :to="`/packs/${pack.slug}`"
+        class="panel group relative flex flex-col p-4 transition-all hover:-translate-y-0.5"
+      >
+        <div class="mb-2 flex items-center justify-between gap-2">
+          <span
+            class="mono text-[10px] font-semibold uppercase tracking-wider"
+            :style="{ color: sourceAccent(pack.source) }"
+          >
+            {{ sourceLabel(pack.source) }}
+          </span>
+          <span class="mono text-[10px] text-[var(--color-text-muted)]">
+            {{ formatDate(pack.publishedAt) }}
+          </span>
+        </div>
+
+        <h3 class="line-clamp-2 text-base font-semibold leading-snug text-[var(--color-text)] group-hover:text-[var(--color-emerald)]">
+          {{ pack.title }}
+        </h3>
+
+        <p v-if="pack.description" class="mt-2 line-clamp-2 flex-1 text-sm text-[var(--color-text-soft)]">
+          {{ pack.description }}
+        </p>
+        <p v-else class="mt-2 flex-1 text-sm text-[var(--color-text-muted)] italic">
+          No description
+        </p>
+
+        <div class="mt-3 flex items-center justify-between text-xs">
+          <span v-if="pack.author" class="mono text-[var(--color-text-muted)]">{{ pack.author }}</span>
+          <span v-if="pack.popularity !== null" class="mono text-[var(--color-text-muted)]">
+            ▲ {{ pack.popularity }}
+          </span>
+        </div>
+      </RouterLink>
+    </div>
+
+    <!-- Pagination -->
+    <div v-if="pages > 1" class="mt-6 flex items-center justify-center gap-2">
+      <button
+        type="button"
+        class="btn-ghost"
+        :disabled="page <= 1"
+        @click="page--"
+      >
+        ← Prev
+      </button>
+      <span class="mono px-3 text-sm text-[var(--color-text-soft)]">
+        {{ page }} / {{ pages }}
+      </span>
+      <button
+        type="button"
+        class="btn-ghost"
+        :disabled="page >= pages"
+        @click="page++"
+      >
+        Next →
+      </button>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+</style>

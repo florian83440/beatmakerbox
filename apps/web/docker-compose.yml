@@ -1,0 +1,47 @@
+# Beatmakerbox — static SPA served by nginx, fronted by Traefik.
+# Container naming convention required by vps-ops: <slug>-<role>-<index>
+# → here "beatmakerbox-web-1" (the "-1" is appended by docker compose).
+#
+# Set BEATMAKERBOX_DOMAIN in .env (e.g. BEATMAKERBOX_DOMAIN=beatmakerbox.com)
+# before the first `docker compose up -d`.
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: beatmakerbox:latest
+    container_name: beatmakerbox-web-1
+    restart: unless-stopped
+    networks:
+      - traefik_proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik_proxy"
+
+      # HTTP → HTTPS redirect
+      - "traefik.http.routers.beatmakerbox-http.rule=Host(`${BEATMAKERBOX_DOMAIN}`)"
+      - "traefik.http.routers.beatmakerbox-http.entrypoints=web"
+      - "traefik.http.routers.beatmakerbox-http.middlewares=beatmakerbox-redirect"
+      - "traefik.http.middlewares.beatmakerbox-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.beatmakerbox-redirect.redirectscheme.permanent=true"
+
+      # HTTPS router
+      - "traefik.http.routers.beatmakerbox.rule=Host(`${BEATMAKERBOX_DOMAIN}`)"
+      - "traefik.http.routers.beatmakerbox.entrypoints=websecure"
+      - "traefik.http.routers.beatmakerbox.tls=true"
+      - "traefik.http.routers.beatmakerbox.tls.certresolver=le"
+      - "traefik.http.services.beatmakerbox.loadbalancer.server.port=80"
+
+      # Sensible security headers for a public static site
+      - "traefik.http.middlewares.beatmakerbox-sec.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.beatmakerbox-sec.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.beatmakerbox-sec.headers.stsPreload=true"
+      - "traefik.http.middlewares.beatmakerbox-sec.headers.contentTypeNosniff=true"
+      - "traefik.http.middlewares.beatmakerbox-sec.headers.frameDeny=true"
+      - "traefik.http.middlewares.beatmakerbox-sec.headers.referrerPolicy=strict-origin-when-cross-origin"
+      - "traefik.http.routers.beatmakerbox.middlewares=beatmakerbox-sec"
+
+networks:
+  traefik_proxy:
+    external: true

@@ -1,0 +1,14 @@
+{
+  "name": "beatmakerbox-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "pnpm -F @beatmakerbox/web dev",
+    "build": "pnpm -F @beatmakerbox/web build",
+    "build:web": "pnpm -F @beatmakerbox/web build",
+    "build:aggregator": "pnpm -F @beatmakerbox/aggregator build",
+    "dev:aggregator": "pnpm -F @beatmakerbox/aggregator dev",
+    "type-check": "pnpm -r type-check"
+  },
+  "packageManager": "pnpm@9.15.9"
+}
